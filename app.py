@@ -1,14 +1,31 @@
 import string
+from random import shuffle
+import random
 
 import pygame as pg
 
 from src.numbers import SlotNumber
 
 
+def to_txt(to_grid):
+    with open("./puzzle/grid.txt", "w") as f:
+        text = ""
+        for i in range(9):
+            for j in range(9):
+                text += to_grid[i][j].num + " "
+            text.strip()
+            text += "\n"
+
+        cleaned = len(text) - 1
+        f.write(text[0:cleaned])
+
+
 class Sudoku:
     def __init__(self):
+        self.HINTS = 18
         self.width = 500
         self.height = 600
+        self.path = "./puzzle/field.txt"
 
         self.x, self.y, self.val = 0, 0, 0
         self.dif = self.width / 9
@@ -87,14 +104,14 @@ class Sudoku:
                 if self.field[i][j].base is False:
                     self.field[i][j] = SlotNumber('0', False)
 
-    def remove_slot(self):
-        if self.field[self.x][self.y].base is False:
+    def remove_slot(self, force=False):
+        if self.field[self.x][self.y].base is False or force:
             self.field[self.x][self.y] = SlotNumber('0', False)
 
-    def raise_message(self, message):
+    def raise_message(self, message, y_offset=0):
         font = pg.font.SysFont("arial", 18)
         text = font.render(f"{message}", True, "black")
-        self.screen.blit(text, (5, self.width + 6))
+        self.screen.blit(text, (5, self.width + 6 + y_offset))
 
     def find_empty(self):
         for i in range(9):
@@ -105,15 +122,71 @@ class Sudoku:
 
         return None, None
 
-    def to_txt(self):
-        with open("./puzzle/grid.txt", "w") as f:
-            text = ""
-            for i in range(9):
-                for j in range(9):
-                    text += self.field[j][i].num + " "
-                text += "\n"
+    def amount_numbers(self):
+        count = 0
+        for i in range(9):
+            for j in range(9):
+                if self.field[i][j].num != '0':
+                    count += 1
+        return count
 
-            f.write(text)
+    def draw_and_update(self):
+        self.screen.fill("white")
+        self.draw()
+        pg.display.update()
+
+    def generate(self):
+        list1 = [i for i in range(1, 10)]
+        list2 = [str(i) for i in range(1, 10)]
+
+        shuffle(list1)
+        shuffle(list2)
+
+        grid = list()
+        tmp = []
+        for i in list1:
+            tmp.append(SlotNumber(i, True))
+        grid.append(tmp)
+
+        val = grid[0][0].num
+        index = list2.index(val)
+
+        tmp1 = list2[index]
+        tmp2 = list2[0]
+        list2[index] = tmp2
+        list2[0] = tmp1
+
+        for i in range(1, 9):
+            tmp = list()
+            tmp.append(SlotNumber(list2[i], True))
+            for _ in range(1, 9):
+                tmp.append(SlotNumber(0, False))
+            grid.append(tmp)
+
+        self.field = grid
+        if self.solver(0) is False:
+            self.generate()
+        else:
+            to_txt(grid)
+            amount = self.amount_numbers()
+            while amount >= self.HINTS:
+                amount = self.amount_numbers()
+                x_ran = random.randint(0, 8)
+                y_ran = random.randint(0, 8)
+                self.x = x_ran
+                self.y = y_ran
+                self.remove_slot(True)
+
+                self.draw_and_update()
+                pg.time.delay(50)
+
+            to_txt(self.field)
+            self.path = "./puzzle/grid.txt"
+            self.field = self.parse_sud()
+
+            self.x = 0
+            self.y = 0
+            self.draw_and_update()
 
     def solver(self, time):
         i, j = self.find_empty()
@@ -127,9 +200,7 @@ class Sudoku:
                 self.field[i][j] = SlotNumber(str(val), False)
                 # Delaying
                 if time != 0:
-                    self.screen.fill("white")
-                    self.draw()
-                    pg.display.update()
+                    self.draw_and_update()
                     pg.time.delay(time)
 
                 if self.solver(time):
@@ -138,9 +209,8 @@ class Sudoku:
 
         return False
 
-    @staticmethod
-    def parse_sud():
-        with open("puzzle/field.txt", "r") as f:
+    def parse_sud(self):
+        with open(self.path, "r") as f:
             puzzle = f.read()
 
             parsed = []
@@ -165,18 +235,20 @@ class Sudoku:
         return True
 
     def invalid(self):
-        ranges = [[i.num for i in self.field[self.x]]]
+        t_y = self.y
+        t_x = self.x
+        ranges = [[i.num for i in self.field[t_x]]]
 
         tmp = []
         for s in self.field:
-            tmp.append(s[self.y].num)
+            tmp.append(s[t_y].num)
 
         ranges.append(tmp)
 
         tmp = []
         for s in range(3):
             for d in range(3):
-                tmp.append(self.field[self.x // 3 * 3 + d][self.y // 3 * 3 + s].num)
+                tmp.append(self.field[t_x // 3 * 3 + d][t_y // 3 * 3 + s].num)
 
         ranges.append(tmp)
 
@@ -206,7 +278,8 @@ class Sudoku:
             self.screen.fill("white")
             self.draw()
             if won is False:
-                self.raise_message("Controls: UP, DOWN, LEFT, numbers from 1 to 9, RETURN/s to solve")
+                self.raise_message("Controls: UP, DOWN, LEFT, numbers from '1' to '9', RETURN/'s' to solve")
+                self.raise_message("               't' for grid copy, 'g' to generate a random grid.", 20)
 
             for event in pg.event.get():
                 if event.type == pg.QUIT:
@@ -257,7 +330,10 @@ class Sudoku:
                     elif key == pg.K_r:
                         self.reset_to_default()
                     elif key == pg.K_t:
-                        self.to_txt()
+                        to_txt(self.field)
+                        print("Copied.")
+                    elif key == pg.K_g:
+                        self.generate()
 
                     is_valid = self.valid(invalids, value)
                     print("Value is:\t", is_valid)
