@@ -72,10 +72,71 @@ class Sudoku:
         self.x = int(pos[0] // self.dif)
         self.y = int(pos[1] // self.dif)
 
+    def move(self, x, y):
+        x_dif = self.x + x
+        y_dif = self.y + y
+
+        if 0 <= x_dif <= 8 and 0 <= y_dif <= 8:
+            self.x += x
+            self.y += y
+
+    def reset_to_default(self):
+        print("Resetting....")
+        for i in range(9):
+            for j in range(9):
+                if self.field[i][j].base is False:
+                    self.field[i][j] = SlotNumber('0', False)
+
+    def remove_slot(self):
+        if self.field[self.x][self.y].base is False:
+            self.field[self.x][self.y] = SlotNumber('0', False)
+
     def raise_message(self, message):
-        font = pg.font.SysFont("arial", 20)
+        font = pg.font.SysFont("arial", 18)
         text = font.render(f"{message}", True, "black")
         self.screen.blit(text, (5, self.width + 6))
+
+    def find_empty(self):
+        for i in range(9):
+            for j in range(9):
+                num = self.field[j][i].num
+                if num == '0':
+                    return j, i
+
+        return None, None
+
+    def to_txt(self):
+        with open("./puzzle/grid.txt", "w") as f:
+            text = ""
+            for i in range(9):
+                for j in range(9):
+                    text += self.field[j][i].num + " "
+                text += "\n"
+
+            f.write(text)
+
+    def solver(self, time):
+        i, j = self.find_empty()
+        if i is None:
+            return True
+        self.x = i
+        self.y = j
+        valids = self.invalid()
+        for val in range(1, 10):
+            if self.valid(valids, val):
+                self.field[i][j] = SlotNumber(str(val), False)
+                # Delaying
+                if time != 0:
+                    self.screen.fill("white")
+                    self.draw()
+                    pg.display.update()
+                    pg.time.delay(time)
+
+                if self.solver(time):
+                    return True
+                self.field[i][j] = SlotNumber('0', False)
+
+        return False
 
     @staticmethod
     def parse_sud():
@@ -126,48 +187,77 @@ class Sudoku:
             if str(val) in i:
                 return False
 
-        if self.field[self.x][self.y].base:
+        if self.field[self.x][self.y].base or val == '0':
             return False
 
         return True
 
+    def debug(self):
+        print(f"click on:\tx:{self.x}\ty:{self.y}")
+        print(f"Invalids:\t {self.invalid()}")
+
     def run(self):
         self.draw()
         pg.display.flip()
+        won = False
 
         run = True
         while run:
             self.screen.fill("white")
             self.draw()
+            if won is False:
+                self.raise_message("Controls: UP, DOWN, LEFT, numbers from 1 to 9, RETURN/s to solve")
 
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     run = False
                 if event.type == pg.MOUSEBUTTONDOWN:
                     self.pos_rect()
-                    print(f"click on:\tx:{self.x}\ty:{self.y}")
-                    print(f"Invalids:\t {self.invalid()}")
+                    self.debug()
                 if event.type == pg.KEYDOWN:
                     invalids = self.invalid()
                     value = '0'
-                    if event.key == pg.K_1:
+                    key = event.key
+                    if key == pg.K_LEFT:
+                        self.move(-1, 0)
+                        self.debug()
+                    elif key == pg.K_RIGHT:
+                        self.move(1, 0)
+                        self.debug()
+                    elif key == pg.K_UP:
+                        self.move(0, -1)
+                        self.debug()
+                    elif key == pg.K_DOWN:
+                        self.move(0, 1)
+                        self.debug()
+                    elif key == pg.K_1:
                         value = '1'
-                    elif event.key == pg.K_2:
+                    elif key == pg.K_2:
                         value = '2'
-                    elif event.key == pg.K_3:
+                    elif key == pg.K_3:
                         value = '3'
-                    elif event.key == pg.K_4:
+                    elif key == pg.K_4:
                         value = '4'
-                    elif event.key == pg.K_5:
+                    elif key == pg.K_5:
                         value = '5'
-                    elif event.key == pg.K_6:
+                    elif key == pg.K_6:
                         value = '6'
-                    elif event.key == pg.K_7:
+                    elif key == pg.K_7:
                         value = '7'
-                    elif event.key == pg.K_8:
+                    elif key == pg.K_8:
                         value = '8'
-                    elif event.key == pg.K_9:
+                    elif key == pg.K_9:
                         value = '9'
+                    elif key == pg.K_BACKSPACE:
+                        self.remove_slot()
+                    elif key == pg.K_RETURN:
+                        self.solver(0)
+                    elif key == pg.K_s:
+                        self.solver(40)
+                    elif key == pg.K_r:
+                        self.reset_to_default()
+                    elif key == pg.K_t:
+                        self.to_txt()
 
                     is_valid = self.valid(invalids, value)
                     print("Value is:\t", is_valid)
@@ -176,6 +266,7 @@ class Sudoku:
                         self.field[self.x][self.y] = SlotNumber(value, False)
 
             if self.game_won():
+                won = True
                 self.raise_message("Game Won!")
             self.select_box()
             pg.display.update()
