@@ -1,10 +1,16 @@
+import random
 import string
 from random import shuffle
-import random
 
 import pygame as pg
+import pygame.event
 
 from src.numbers import SlotNumber
+
+# Config
+TIME = 0
+TIME_SLOW = 60
+HINTS = 25
 
 
 def to_txt(to_grid):
@@ -22,7 +28,7 @@ def to_txt(to_grid):
 
 class Sudoku:
     def __init__(self):
-        self.HINTS = 18
+        self.HINTS = HINTS
         self.width = 500
         self.height = 600
         self.path = "./puzzle/field.txt"
@@ -170,6 +176,7 @@ class Sudoku:
             to_txt(grid)
             amount = self.amount_numbers()
             while amount >= self.HINTS:
+                pygame.event.pump()
                 amount = self.amount_numbers()
                 x_ran = random.randint(0, 8)
                 y_ran = random.randint(0, 8)
@@ -189,6 +196,7 @@ class Sudoku:
             self.draw_and_update()
 
     def solver(self, time):
+        pygame.event.pump()
         i, j = self.find_empty()
         if i is None:
             return True
@@ -324,9 +332,9 @@ class Sudoku:
                     elif key == pg.K_BACKSPACE:
                         self.remove_slot()
                     elif key == pg.K_RETURN:
-                        self.solver(0)
+                        self.solver(TIME)
                     elif key == pg.K_s:
-                        self.solver(40)
+                        self.solver(TIME_SLOW)
                     elif key == pg.K_r:
                         self.reset_to_default()
                     elif key == pg.K_t:
