@@ -11,7 +11,7 @@ from src.numbers import SlotNumber
 TIME = 0
 TIME_SLOW = 60
 HINTS = 25
-
+# =================================
 
 def to_txt(to_grid):
     with open("./puzzle/grid.txt", "w") as f:
